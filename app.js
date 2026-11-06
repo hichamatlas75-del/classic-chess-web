@@ -85,6 +85,11 @@
   };
 
   const THEMES = ['theme-wood', 'theme-classic', 'theme-slate'];
+  const THEME_LABELS = {
+    'theme-wood': 'Bois Noble & Noyer',
+    'theme-classic': 'Tournoi Classique',
+    'theme-slate': 'Ardoise Moderne'
+  };
 
   // --------------------------------------------------------------------------
   // 2. Gestionnaire Audio Web (Synthèse pure sans dépendances externes)
@@ -179,17 +184,19 @@
   }
 
   // --------------------------------------------------------------------------
-  // 3. Moteur IA MiniMax avec Élagage Alpha-Bêta
+  // 3. Moteur IA MiniMax avec Élagage Alpha-Bêta & Quiescence Simplifiée
   // --------------------------------------------------------------------------
   class ChessAI {
     constructor() {
       this.depth = 2;
     }
 
-    // Évaluation heuristique du plateau
-    evaluate(game) {
+    // Évaluation heuristique du plateau avec bonus pour les mats rapides
+    evaluate(game, depthRemaining = 0) {
       if (game.in_checkmate()) {
-        return game.turn() === 'w' ? -99999 : 99999;
+        // Favoriser un mat plus rapide (score plus extrême quand depthRemaining est grand)
+        const mateBonus = depthRemaining * 500;
+        return game.turn() === 'w' ? -(99999 + mateBonus) : (99999 + mateBonus);
       }
       if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) {
         return 0;
@@ -223,7 +230,7 @@
       return score;
     }
 
-    // Tri des coups (Move Ordering) pour maximiser les coupures alpha-bêta
+    // Tri des coups (Move Ordering MVV-LVA + Promotions + Roque)
     orderMoves(moves) {
       return moves.sort((a, b) => {
         let scoreA = 0;
@@ -231,18 +238,22 @@
         if (a.captured) {
           scoreA += 10 * PIECE_VALUES[a.captured] - PIECE_VALUES[a.piece];
         }
-        if (a.promotion) scoreA += 800;
+        if (a.promotion) scoreA += PIECE_VALUES[a.promotion] || 800;
+        if (a.flags && (a.flags.includes('k') || a.flags.includes('q'))) scoreA += 60;
+
         if (b.captured) {
           scoreB += 10 * PIECE_VALUES[b.captured] - PIECE_VALUES[b.piece];
         }
-        if (b.promotion) scoreB += 800;
+        if (b.promotion) scoreB += PIECE_VALUES[b.promotion] || 800;
+        if (b.flags && (b.flags.includes('k') || b.flags.includes('q'))) scoreB += 60;
+
         return scoreB - scoreA;
       });
     }
 
     minimax(game, depth, alpha, beta, isMaximizing) {
       if (depth === 0 || game.game_over()) {
-        return this.evaluate(game);
+        return this.evaluate(game, depth);
       }
 
       const rawMoves = game.moves({ verbose: true });
@@ -273,16 +284,15 @@
       }
     }
 
-    // Sélection du meilleur coup
+    // Sélection du meilleur coup avec variété sur les ex-aequo
     getBestMove(game, depth = 2) {
       const rawMoves = game.moves({ verbose: true });
-      if (movesCount(rawMoves) === 0) return null;
+      if (!rawMoves || rawMoves.length === 0) return null;
 
-      // Niveau 1 (Débutant) : Choix simple et rapide
+      // Niveau 1 (Débutant) : Choix rapide et opportuniste
       if (depth === 1) {
-        // Priorité aux captures si existantes, sinon coup aléatoire
         const captures = rawMoves.filter(m => m.captured);
-        if (captures.length > 0 && Math.random() < 0.6) {
+        if (captures.length > 0 && Math.random() < 0.65) {
           return captures[Math.floor(Math.random() * captures.length)];
         }
         return rawMoves[Math.floor(Math.random() * rawMoves.length)];
@@ -291,13 +301,17 @@
       const isMaximizing = (game.turn() === 'w');
       let bestMove = null;
       let bestValue = isMaximizing ? -Infinity : Infinity;
+      let alpha = -Infinity;
+      let beta = Infinity;
 
-      const orderedMoves = this.orderMoves(rawMoves);
+      // Mélanger légèrement les coups avant de les trier pour varier les ouvertures à score égal
+      const shuffledMoves = rawMoves.sort(() => Math.random() - 0.5);
+      const orderedMoves = this.orderMoves(shuffledMoves);
 
       for (let i = 0; i < orderedMoves.length; i++) {
         const move = orderedMoves[i];
         game.move(move);
-        const value = this.minimax(game, depth - 1, -Infinity, Infinity, !isMaximizing);
+        const value = this.minimax(game, depth - 1, alpha, beta, !isMaximizing);
         game.undo();
 
         if (isMaximizing) {
@@ -305,20 +319,18 @@
             bestValue = value;
             bestMove = move;
           }
+          alpha = Math.max(alpha, bestValue);
         } else {
           if (value < bestValue) {
             bestValue = value;
             bestMove = move;
           }
+          beta = Math.min(beta, bestValue);
         }
       }
 
       return bestMove || orderedMoves[0];
     }
-  }
-
-  function movesCount(arr) {
-    return arr ? arr.length : 0;
   }
 
   // --------------------------------------------------------------------------
@@ -345,6 +357,8 @@
       this.lastMove = null;
       this.pendingPromotion = null;
       this.isAiThinking = false;
+      this.aiTimer = null; // Identifiant du timer IA pour éviter les race conditions
+      this.toastTimer = null;
 
       // Cache DOM
       this.dom = {
@@ -371,6 +385,8 @@
         btnNewGame: document.getElementById('btn-new-game'),
         btnUndo: document.getElementById('btn-undo'),
         btnFlip: document.getElementById('btn-flip'),
+        btnCopyPgn: document.getElementById('btn-copy-pgn'),
+        btnCopyFen: document.getElementById('btn-copy-fen'),
         btnSound: document.getElementById('btn-sound'),
         soundIcon: document.getElementById('sound-icon'),
         btnTheme: document.getElementById('btn-theme'),
@@ -390,13 +406,15 @@
         gameOverIcon: document.getElementById('gameover-icon'),
         btnGameOverRestart: document.getElementById('btn-gameover-restart'),
         btnGameOverClose: document.getElementById('btn-gameover-close'),
-        modalRules: document.getElementById('modal-rules')
+        modalRules: document.getElementById('modal-rules'),
+        toast: document.getElementById('toast-notification')
       };
 
       this.init();
     }
 
     init() {
+      this.loadPreferences();
       this.bindEvents();
       this.buildBoard();
       this.render();
@@ -405,6 +423,51 @@
       if (this.mode === 'ai' && this.aiColor === 'w') {
         this.triggerAiMove();
       }
+    }
+
+    // ------------------------------------------------------------------------
+    // Préférences Utilisateur (localStorage) & Notifications
+    // ------------------------------------------------------------------------
+    loadPreferences() {
+      try {
+        const savedSound = localStorage.getItem('chess_sound');
+        if (savedSound !== null) {
+          this.audio.enabled = savedSound === 'true';
+          if (this.dom.soundIcon) {
+            this.dom.soundIcon.textContent = this.audio.enabled ? '🔊' : '🔇';
+          }
+        }
+        const savedTheme = localStorage.getItem('chess_theme_idx');
+        if (savedTheme !== null) {
+          const idx = parseInt(savedTheme, 10);
+          if (!isNaN(idx) && idx >= 0 && idx < THEMES.length) {
+            this.themeIndex = idx;
+            THEMES.forEach(t => this.dom.board.classList.remove(t));
+            this.dom.board.classList.add(THEMES[this.themeIndex]);
+          }
+        }
+      } catch (e) {
+        // Ignorer si localStorage est désactivé
+      }
+    }
+
+    savePreferences() {
+      try {
+        localStorage.setItem('chess_sound', String(this.audio.enabled));
+        localStorage.setItem('chess_theme_idx', String(this.themeIndex));
+      } catch (e) {
+        // Ignorer
+      }
+    }
+
+    showToast(message) {
+      if (!this.dom.toast) return;
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+      this.dom.toast.textContent = message;
+      this.dom.toast.classList.remove('hidden');
+      this.toastTimer = setTimeout(() => {
+        this.dom.toast.classList.add('hidden');
+      }, 2400);
     }
 
     // ------------------------------------------------------------------------
@@ -445,7 +508,7 @@
           squareEl.className = 'square';
           squareEl.dataset.square = squareName;
 
-          // Déterminer la couleur de la case
+          // Déterminer la couleur de la case (Standard FIDE : a1 = foncée, h1 = claire)
           const fileIdx = files.indexOf(file);
           const rankIdx = parseInt(rank, 10);
           const isLight = (fileIdx + rankIdx) % 2 === 0;
@@ -462,7 +525,6 @@
     }
 
     render() {
-      const board = this.game.board(); // 8x8 de 8 à 1 et a à h
       const kingSquareInCheck = this.game.in_check() ? this.getKingSquare(this.game.turn()) : null;
 
       // Parcourir toutes les cases du DOM
@@ -490,10 +552,14 @@
           sq.classList.add('in-check');
         }
 
-        // Surbrillance des coups possibles
+        // Surbrillance des coups possibles (prise standard 'c' ou prise en passant 'e')
         const legalMove = this.legalMovesFromSquare.find(m => m.to === sqName);
         if (legalMove) {
-          if (legalMove.captured || (legalMove.flags && legalMove.flags.includes('c'))) {
+          const isCapture = Boolean(
+            legalMove.captured ||
+            (legalMove.flags && (legalMove.flags.includes('c') || legalMove.flags.includes('e')))
+          );
+          if (isCapture) {
             sq.classList.add('hint-capture');
           } else {
             sq.classList.add('hint-move');
@@ -592,7 +658,7 @@
       this.render();
     }
 
-    // Drag and drop
+    // Drag and drop (CORRIGÉ : pas de reconstruction DOM synchrone dans dragstart)
     handleDragStart(squareName, event) {
       if (this.isAiThinking || this.game.game_over()) {
         event.preventDefault();
@@ -616,7 +682,24 @@
       event.dataTransfer.setData('text/plain', squareName);
       event.dataTransfer.effectAllowed = 'move';
       event.target.classList.add('dragging');
-      this.render();
+
+      // Appliquer les classes d'indices visuels directement sans détruire le nœud glissé
+      const squares = this.dom.board.querySelectorAll('.square');
+      squares.forEach(sq => {
+        const sqName = sq.dataset.square;
+        sq.classList.remove('selected', 'hint-move', 'hint-capture');
+        if (sqName === squareName) {
+          sq.classList.add('selected');
+        }
+        const legalMove = this.legalMovesFromSquare.find(m => m.to === sqName);
+        if (legalMove) {
+          const isCapture = Boolean(
+            legalMove.captured ||
+            (legalMove.flags && (legalMove.flags.includes('c') || legalMove.flags.includes('e')))
+          );
+          sq.classList.add(isCapture ? 'hint-capture' : 'hint-move');
+        }
+      });
     }
 
     handleDragOver(event) {
@@ -626,7 +709,7 @@
 
     handleDrop(targetSquare, event) {
       event.preventDefault();
-      const fromSquare = event.dataTransfer.getData('text/plain');
+      const fromSquare = event.dataTransfer.getData('text/plain') || this.selectedSquare;
       if (!fromSquare || fromSquare === targetSquare) {
         this.clearSelection();
         return;
@@ -662,7 +745,6 @@
     }
 
     showPromotionModal(color) {
-      // Mettre à jour les icônes de la modale avec la bonne couleur
       ['q', 'r', 'b', 'n'].forEach(type => {
         const iconEl = document.getElementById(`promo-${type}`);
         const svgKey = color + type.toUpperCase();
@@ -680,6 +762,12 @@
         this.pendingPromotion = null;
         this.makeMove({ from, to, promotion: pieceType });
       }
+    }
+
+    cancelPromotion() {
+      this.dom.modalPromotion.classList.add('hidden');
+      this.pendingPromotion = null;
+      this.clearSelection();
     }
 
     makeMove(moveObj) {
@@ -716,16 +804,29 @@
     }
 
     // ------------------------------------------------------------------------
-    // Tour de l'IA (Asynchrone avec retour visuel)
+    // Tour de l'IA (Asynchrone sécurisé contre les race conditions)
     // ------------------------------------------------------------------------
     triggerAiMove() {
+      if (this.aiTimer) {
+        clearTimeout(this.aiTimer);
+        this.aiTimer = null;
+      }
+
       this.isAiThinking = true;
       this.updateStatusAndUI();
 
       // Délai naturel pour donner l'impression de réflexion
-      const thinkDelay = this.aiDifficulty === 3 ? 350 : 250;
+      const thinkDelay = this.aiDifficulty === 3 ? 320 : 240;
 
-      setTimeout(() => {
+      this.aiTimer = setTimeout(() => {
+        this.aiTimer = null;
+        // Vérifier que le mode et le tour n'ont pas changé entre-temps
+        if (this.mode !== 'ai' || this.game.turn() !== this.aiColor || this.game.game_over()) {
+          this.isAiThinking = false;
+          this.updateStatusAndUI();
+          return;
+        }
+
         const aiMove = this.ai.getBestMove(this.game, this.aiDifficulty);
         this.isAiThinking = false;
 
@@ -738,19 +839,44 @@
     }
 
     // ------------------------------------------------------------------------
-    // Annulation de coup (Undo)
+    // Annulation de coup (Undo sécurisé pour Blancs et Noirs)
     // ------------------------------------------------------------------------
     undoMove() {
-      if (this.isAiThinking) return;
+      if (this.aiTimer) {
+        clearTimeout(this.aiTimer);
+        this.aiTimer = null;
+        this.isAiThinking = false;
+      }
+
+      const historyLen = this.game.history().length;
+      if (historyLen === 0) {
+        this.showToast('Aucun coup à annuler.');
+        return;
+      }
 
       if (this.mode === 'ai') {
-        // En mode IA, annuler le coup de l'IA et le coup du joueur
-        this.game.undo();
-        this.game.undo();
+        const humanColor = (this.aiColor === 'w') ? 'b' : 'w';
+        // Si l'humain joue les Noirs et que seule l'IA a joué le 1er coup, ne pas vider la partie en laissant l'humain bloqué
+        if (this.aiColor === 'w' && historyLen <= 1) {
+          this.showToast('C\'est déjà à votre tour de jouer le premier coup des Noirs !');
+          return;
+        }
+
+        // Si c'est au tour de l'humain, on annule le coup de l'IA puis le coup de l'humain
+        if (this.game.turn() === humanColor && historyLen >= 2) {
+          this.game.undo();
+          this.game.undo();
+        } else {
+          // Si on a interrompu l'IA pendant sa réflexion ou si la partie vient de se terminer sur le coup de l'humain
+          this.game.undo();
+        }
       } else {
         // En mode 2 joueurs, annuler le coup précédent
         this.game.undo();
       }
+
+      // Fermer la modale de fin de partie si elle était ouverte
+      this.dom.modalGameOver.classList.add('hidden');
 
       // Mettre à jour le dernier coup
       const history = this.game.history({ verbose: true });
@@ -762,6 +888,11 @@
       }
 
       this.clearSelection();
+
+      // Si après annulation c'est au tour de l'IA (ex: début de partie avec les Noirs)
+      if (this.mode === 'ai' && this.game.turn() === this.aiColor && !this.game.game_over()) {
+        this.triggerAiMove();
+      }
     }
 
     // ------------------------------------------------------------------------
@@ -782,19 +913,32 @@
       this.dom.playerTop.classList.toggle('active-turn', isTopActive);
       this.dom.playerBottom.classList.toggle('active-turn', isBottomActive);
 
+      // Mettre à jour les avatars dynamiquement selon la couleur en haut et en bas
+      if (this.dom.avatarTop) {
+        this.dom.avatarTop.textContent = (topColor === 'w') ? '♙' : '♟️';
+      }
+      if (this.dom.avatarBottom) {
+        this.dom.avatarBottom.textContent = (bottomColor === 'w') ? '♙' : '♟️';
+      }
+
       // Titres des joueurs
       if (this.mode === 'ai') {
-        const humanColor = (this.aiColor === 'w') ? 'b' : 'w';
-        this.dom.nameTop.textContent = (topColor === this.aiColor) ? '🤖 IA Solo (Moteur)' : '👤 Vous';
-        this.dom.nameBottom.textContent = (bottomColor === this.aiColor) ? '🤖 IA Solo (Moteur)' : '👤 Vous';
+        const topColorLabel = (topColor === 'w') ? 'Blancs' : 'Noirs';
+        const bottomColorLabel = (bottomColor === 'w') ? 'Blancs' : 'Noirs';
+        this.dom.nameTop.textContent = (topColor === this.aiColor)
+          ? `🤖 IA Solo (${topColorLabel})`
+          : `👤 Vous (${topColorLabel})`;
+        this.dom.nameBottom.textContent = (bottomColor === this.aiColor)
+          ? `🤖 IA Solo (${bottomColorLabel})`
+          : `👤 Vous (${bottomColorLabel})`;
       } else {
-        this.dom.nameTop.textContent = (topColor === 'w') ? 'Joueur Blancs' : 'Joueur Noirs';
-        this.dom.nameBottom.textContent = (bottomColor === 'w') ? 'Joueur Blancs' : 'Joueur Noirs';
+        this.dom.nameTop.textContent = (topColor === 'w') ? 'Joueur 1 (Blancs)' : 'Joueur 2 (Noirs)';
+        this.dom.nameBottom.textContent = (bottomColor === 'w') ? 'Joueur 1 (Blancs)' : 'Joueur 2 (Noirs)';
       }
 
       // Statut sous le nom
       if (isTopActive) {
-        this.dom.subTop.textContent = this.isAiThinking ? 'Réfléchit au prochain coup...' : 'À vous de jouer';
+        this.dom.subTop.textContent = this.isAiThinking ? 'Réfléchit au prochain coup...' : 'Trait à ce joueur';
         this.dom.subBottom.textContent = 'En attente';
       } else if (isBottomActive) {
         this.dom.subBottom.textContent = this.isAiThinking ? 'Réfléchit au prochain coup...' : 'À vous de jouer';
@@ -811,14 +955,14 @@
         this.dom.statusBanner.className = 'status-banner alert';
         this.dom.statusBanner.classList.remove('hidden');
       } else if (this.isAiThinking) {
-        this.dom.statusBanner.textContent = `🤖 L'IA réfléchit...`;
+        this.dom.statusBanner.textContent = `🤖 L'IA calcule le meilleur coup...`;
         this.dom.statusBanner.className = 'status-banner';
         this.dom.statusBanner.classList.remove('hidden');
       } else {
         this.dom.statusBanner.classList.add('hidden');
       }
 
-      // 2. Pièces capturées & Évaluation matérielle
+      // 2. Pièces capturées & Évaluation matérielle (basé sur l'historique exact des prises + promotions)
       this.updateCapturedAndAdvantage();
 
       // 3. Historique des coups
@@ -826,42 +970,37 @@
     }
 
     updateCapturedAndAdvantage() {
-      // Comptage des pièces présentes sur le plateau
-      const counts = { w: { p:0, n:0, b:0, r:0, q:0 }, b: { p:0, n:0, b:0, r:0, q:0 } };
+      // Utiliser l'historique réel des coups pour connaître les pièces véritablement capturées
+      // (Évite les valeurs négatives lorsqu'un pion est promu en 2ème Dame !)
+      const verboseHistory = this.game.history({ verbose: true });
+      const capturedByWhite = []; // Pièces noires capturées par les Blancs
+      const capturedByBlack = []; // Pièces blanches capturées par les Noirs
+
+      verboseHistory.forEach(move => {
+        if (move.captured) {
+          if (move.color === 'w') {
+            capturedByWhite.push({ color: 'b', type: move.captured });
+          } else {
+            capturedByBlack.push({ color: 'w', type: move.captured });
+          }
+        }
+      });
+
+      // Calculer le matériel réel sur l'échiquier (incluant la valeur des pions promus)
+      let scoreWhite = 0;
+      let scoreBlack = 0;
       const board = this.game.board();
 
       for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
           const piece = board[r][c];
           if (piece && piece.type !== 'k') {
-            counts[piece.color][piece.type]++;
+            const val = PIECE_VALUES[piece.type] || 0;
+            if (piece.color === 'w') scoreWhite += val;
+            else scoreBlack += val;
           }
         }
       }
-
-      // Pièces initiales
-      const initial = { p:8, n:2, b:2, r:2, q:1 };
-      const capturedByWhite = []; // Pièces noires capturées
-      const capturedByBlack = []; // Pièces blanches capturées
-
-      let scoreWhite = 0;
-      let scoreBlack = 0;
-
-      ['p', 'n', 'b', 'r', 'q'].forEach(type => {
-        const val = PIECE_VALUES[type];
-        // Noires perdues = prises par les Blancs
-        const bLost = initial[type] - counts.b[type];
-        for (let i = 0; i < bLost; i++) {
-          capturedByWhite.push({ color: 'b', type });
-          scoreWhite += val;
-        }
-        // Blanches perdues = prises par les Noirs
-        const wLost = initial[type] - counts.w[type];
-        for (let i = 0; i < wLost; i++) {
-          capturedByBlack.push({ color: 'w', type });
-          scoreBlack += val;
-        }
-      });
 
       // Rendu dans les bandeaux Haut / Bas selon orientation
       const topColor = this.isFlipped ? 'w' : 'b';
@@ -872,16 +1011,14 @@
       this.renderCapturedList(this.dom.capturedBottom, bottomCaptured);
 
       // Calcul avantage matériel (+1, +3...)
-      const diff = Math.floor((scoreWhite - scoreBlack) / 100);
+      const diff = Math.round((scoreWhite - scoreBlack) / 100);
       this.dom.advTop.textContent = '';
       this.dom.advBottom.textContent = '';
 
       if (diff > 0) {
-        // Avantage aux Blancs
         if (topColor === 'w') this.dom.advTop.textContent = `+${diff}`;
         else this.dom.advBottom.textContent = `+${diff}`;
       } else if (diff < 0) {
-        // Avantage aux Noirs
         const absDiff = Math.abs(diff);
         if (topColor === 'b') this.dom.advTop.textContent = `+${absDiff}`;
         else this.dom.advBottom.textContent = `+${absDiff}`;
@@ -890,7 +1027,6 @@
 
     renderCapturedList(container, piecesList) {
       container.innerHTML = '';
-      // Trier par valeur
       piecesList.sort((a, b) => PIECE_VALUES[a.type] - PIECE_VALUES[b.type]);
       piecesList.forEach(p => {
         const svgKey = p.color + p.type.toUpperCase();
@@ -948,8 +1084,36 @@
         this.dom.historyTbody.appendChild(tr);
       }
 
-      // Défilement automatique vers le dernier coup
       this.dom.historyWrapper.scrollTop = this.dom.historyWrapper.scrollHeight;
+    }
+
+    // ------------------------------------------------------------------------
+    // Export PGN / FEN
+    // ------------------------------------------------------------------------
+    copyPgnToClipboard() {
+      const pgn = this.game.pgn() || 'Aucun coup joué.';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pgn).then(() => {
+          this.showToast('📋 Notation PGN copiée dans le presse-papiers !');
+        }).catch(() => {
+          this.showToast('Impossible de copier le PGN.');
+        });
+      } else {
+        this.showToast(`PGN : ${pgn}`);
+      }
+    }
+
+    copyFenToClipboard() {
+      const fen = this.game.fen();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(fen).then(() => {
+          this.showToast('🧬 Position FEN copiée dans le presse-papiers !');
+        }).catch(() => {
+          this.showToast('Impossible de copier le FEN.');
+        });
+      } else {
+        this.showToast(`FEN : ${fen}`);
+      }
     }
 
     // ------------------------------------------------------------------------
@@ -996,6 +1160,11 @@
     }
 
     resetGame() {
+      if (this.aiTimer) {
+        clearTimeout(this.aiTimer);
+        this.aiTimer = null;
+      }
+
       this.game.reset();
       this.selectedSquare = null;
       this.legalMovesFromSquare = [];
@@ -1020,17 +1189,22 @@
 
     cycleTheme() {
       this.themeIndex = (this.themeIndex + 1) % THEMES.length;
+      const newTheme = THEMES[this.themeIndex];
       THEMES.forEach(t => this.dom.board.classList.remove(t));
-      this.dom.board.classList.add(THEMES[this.themeIndex]);
+      this.dom.board.classList.add(newTheme);
+      this.savePreferences();
+      this.showToast(`🎨 Thème : ${THEME_LABELS[newTheme]}`);
     }
 
     toggleSound() {
       this.audio.enabled = !this.audio.enabled;
       this.dom.soundIcon.textContent = this.audio.enabled ? '🔊' : '🔇';
+      this.savePreferences();
+      this.showToast(this.audio.enabled ? '🔊 Effets sonores activés' : '🔇 Effets sonores désactivés');
     }
 
     // ------------------------------------------------------------------------
-    // Liaison des Événements
+    // Liaison des Événements & Raccourcis Clavier
     // ------------------------------------------------------------------------
     bindEvents() {
       // Nouvelle partie & actions
@@ -1040,6 +1214,13 @@
       this.dom.btnSound.addEventListener('click', () => this.toggleSound());
       this.dom.btnTheme.addEventListener('click', () => this.cycleTheme());
 
+      if (this.dom.btnCopyPgn) {
+        this.dom.btnCopyPgn.addEventListener('click', () => this.copyPgnToClipboard());
+      }
+      if (this.dom.btnCopyFen) {
+        this.dom.btnCopyFen.addEventListener('click', () => this.copyFenToClipboard());
+      }
+
       // Règles
       this.dom.btnRules.addEventListener('click', () => this.dom.modalRules.classList.remove('hidden'));
       this.dom.btnRulesClose.addEventListener('click', () => this.dom.modalRules.classList.add('hidden'));
@@ -1047,9 +1228,19 @@
         if (e.target === this.dom.modalRules) this.dom.modalRules.classList.add('hidden');
       });
 
+      // Modale Promotion : clic à l'extérieur annule la promotion en cours
+      this.dom.modalPromotion.addEventListener('click', (e) => {
+        if (e.target === this.dom.modalPromotion) {
+          this.cancelPromotion();
+        }
+      });
+
       // Modale Fin de partie
       this.dom.btnGameOverRestart.addEventListener('click', () => this.resetGame());
       this.dom.btnGameOverClose.addEventListener('click', () => this.dom.modalGameOver.classList.add('hidden'));
+      this.dom.modalGameOver.addEventListener('click', (e) => {
+        if (e.target === this.dom.modalGameOver) this.dom.modalGameOver.classList.add('hidden');
+      });
 
       // Sélecteur de mode
       this.dom.modeAiBtn.addEventListener('click', () => {
@@ -1086,6 +1277,26 @@
         const btn = e.target.closest('.promo-btn');
         if (btn && btn.dataset.piece) {
           this.choosePromotion(btn.dataset.piece);
+        }
+      });
+
+      // Raccourcis clavier (Escape pour fermer modale / désélectionner, Ctrl+Z pour annuler, F pour tourner)
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (!this.dom.modalPromotion.classList.contains('hidden')) {
+            this.cancelPromotion();
+          } else if (!this.dom.modalRules.classList.contains('hidden')) {
+            this.dom.modalRules.classList.add('hidden');
+          } else if (!this.dom.modalGameOver.classList.contains('hidden')) {
+            this.dom.modalGameOver.classList.add('hidden');
+          } else if (this.selectedSquare) {
+            this.clearSelection();
+          }
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          this.undoMove();
+        } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && e.target.tagName !== 'SELECT') {
+          this.flipBoard();
         }
       });
     }

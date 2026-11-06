@@ -83,7 +83,7 @@
           </div>
         </div>
 
-        <!-- Alerte Échec / Tour en direct pour mobile -->
+        <!-- Alerte Échec / Tour en direct -->
         <div id="game-status-banner" class="status-banner hidden"></div>
       </section>
 
@@ -136,13 +136,23 @@
               <span class="btn-icon-text">🔄</span> Tourner
             </button>
           </div>
+
+          <!-- Outils d'export PGN / FEN -->
+          <div class="pgn-tools-grid">
+            <button id="btn-copy-pgn" class="btn btn-secondary btn-sm" title="Copier l'historique PGN dans le presse-papiers">
+              📋 Copier PGN
+            </button>
+            <button id="btn-copy-fen" class="btn btn-secondary btn-sm" title="Copier la position FEN actuelle">
+              🧬 Copier FEN
+            </button>
+          </div>
         </div>
 
         <!-- Historique des Coups -->
         <div class="panel-card history-card">
           <div class="card-header">
             <h2>Historique des Coups (SAN)</h2>
-            <span class="move-counter" id="move-counter">0 coups</span>
+            <span class="move-counter" id="move-counter">0 coup</span>
           </div>
           <div class="history-table-wrapper" id="history-container">
             <table class="history-table">
@@ -222,6 +232,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-notification" class="toast-notification hidden" role="status" aria-live="polite"></div>
 
     <!-- Pied de page -->
     <footer class="app-footer">

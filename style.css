@@ -32,11 +32,17 @@
   /* Thème Bois Traditionnel Noble (par défaut - comme sur la photo) */
   --square-light: #eedbb6;
   --square-dark: #58331b;
-  --highlight-select: rgba(235, 160, 36, 0.5);
-  --highlight-last: rgba(212, 142, 54, 0.42);
-  --highlight-move: rgba(45, 26, 14, 0.3);
-  --highlight-capture: rgba(197, 48, 48, 0.55);
-  --highlight-check: radial-gradient(circle, rgba(220, 38, 38, 0.9) 0%, rgba(185, 28, 28, 0.45) 65%, transparent 100%);
+  --square-light-bg: 
+    repeating-linear-gradient(90deg, rgba(160, 120, 70, 0.05) 0px, rgba(160, 120, 70, 0.05) 1px, transparent 1px, transparent 6px),
+    linear-gradient(135deg, #f2e2c2 0%, #ebd2a4 50%, #deb87b 100%);
+  --square-dark-bg: 
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0px, rgba(0, 0, 0, 0.14) 1px, transparent 1px, transparent 8px),
+    linear-gradient(135deg, #6c3f22 0%, #573117 50%, #43230e 100%);
+  --highlight-select: rgba(235, 160, 36, 0.55);
+  --highlight-last: rgba(212, 142, 54, 0.45);
+  --highlight-move: rgba(45, 26, 14, 0.35);
+  --highlight-capture: rgba(197, 48, 48, 0.6);
+  --highlight-check: radial-gradient(circle, rgba(220, 38, 38, 0.92) 0%, rgba(185, 28, 28, 0.5) 65%, transparent 100%);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -51,16 +57,20 @@
 .theme-classic {
   --square-light: #ebecd0;
   --square-dark: #739552;
-  --highlight-select: rgba(246, 218, 59, 0.6);
-  --highlight-last: rgba(205, 210, 106, 0.55);
+  --square-light-bg: linear-gradient(135deg, #f0f1d8 0%, #e5e6c5 100%);
+  --square-dark-bg: linear-gradient(135deg, #7ea05b 0%, #688a47 100%);
+  --highlight-select: rgba(246, 218, 59, 0.65);
+  --highlight-last: rgba(205, 210, 106, 0.6);
 }
 
 /* Thème Ardoise Contemporain (Optionnel via le bouton thème) */
 .theme-slate {
   --square-light: #e2e8f0;
-  --square-dark: #64748b;
-  --highlight-select: rgba(59, 130, 246, 0.55);
-  --highlight-last: rgba(147, 197, 253, 0.45);
+  --square-dark: #475569;
+  --square-light-bg: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%);
+  --square-dark-bg: linear-gradient(135deg, #64748b 0%, #334155 100%);
+  --highlight-select: rgba(59, 130, 246, 0.6);
+  --highlight-last: rgba(147, 197, 253, 0.5);
 }
 
 * {
@@ -266,7 +276,6 @@ body {
 .captured-list {
   display: flex;
   align-items: center;
-  gap: -4px;
   min-height: 26px;
   flex-wrap: wrap;
 }
@@ -289,6 +298,10 @@ body {
   text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 
+.material-advantage:empty {
+  display: none;
+}
+
 /* --------------------------------------------------------------------------
    Cadre de l'échiquier façon Noyer Massif & Inclusions de Marqueterie Dorée
    -------------------------------------------------------------------------- */
@@ -296,7 +309,6 @@ body {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  /* Teinte et relief noyer massif ciré */
   background: 
     linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, transparent 40%, rgba(0, 0, 0, 0.4) 100%),
     linear-gradient(180deg, #381f12 0%, #26140b 50%, #1a0d07 100%);
@@ -359,7 +371,6 @@ body {
   grid-template-rows: repeat(8, 1fr);
   border-radius: 2px;
   overflow: hidden;
-  /* Ligne de marqueterie érable/dorée entourant les 64 cases */
   border: 2px solid #caa06d;
   box-shadow: 
     0 0 0 2px #1f1007,
@@ -373,40 +384,50 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
-/* Cases claires : Bois d'érable / bouleau miel */
+/* Cases claires */
 .square.light {
   background-color: var(--square-light);
-  background-image: 
-    repeating-linear-gradient(90deg, rgba(160, 120, 70, 0.05) 0px, rgba(160, 120, 70, 0.05) 1px, transparent 1px, transparent 6px),
-    linear-gradient(135deg, #f2e2c2 0%, #ebd2a4 50%, #deb87b 100%);
+  background-image: var(--square-light-bg);
   box-shadow: inset 0 0 5px rgba(100, 60, 20, 0.1);
 }
 
-/* Cases sombres : Noyer riche / palissandre sombre */
+/* Cases sombres */
 .square.dark {
   background-color: var(--square-dark);
-  background-image: 
-    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.14) 0px, rgba(0, 0, 0, 0.14) 1px, transparent 1px, transparent 8px),
-    linear-gradient(135deg, #6c3f22 0%, #573117 50%, #43230e 100%);
+  background-image: var(--square-dark-bg);
   box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.45);
 }
 
-/* ---------------- Surbrillances Échiquier ---------------- */
-.square.selected {
-  background-color: var(--highlight-select) !important;
-  box-shadow: inset 0 0 0 3px rgba(245, 158, 11, 0.8), inset 0 0 12px rgba(245, 158, 11, 0.4) !important;
+/* ---------------- Surbrillances Échiquier (via ::before ou box-shadow pour préserver le bois) ---------------- */
+.square.last-move::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--highlight-last);
+  pointer-events: none;
+  z-index: 2;
 }
 
-.square.last-move {
-  background-color: var(--highlight-last) !important;
-  box-shadow: inset 0 0 6px rgba(212, 142, 54, 0.4) !important;
+.square.selected::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--highlight-select);
+  box-shadow: inset 0 0 0 3px rgba(245, 158, 11, 0.9), inset 0 0 12px rgba(245, 158, 11, 0.45);
+  pointer-events: none;
+  z-index: 3;
 }
 
-.square.in-check {
-  background: var(--highlight-check) !important;
+.square.in-check::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--highlight-check);
+  pointer-events: none;
+  z-index: 4;
   animation: pulse-check 1.4s infinite alternate;
 }
 
@@ -421,12 +442,12 @@ body {
   position: absolute;
   width: 26%;
   height: 26%;
-  background: rgba(36, 20, 11, 0.45);
-  border: 1px solid rgba(255, 235, 205, 0.25);
+  background: rgba(36, 20, 11, 0.55);
+  border: 1.5px solid rgba(255, 235, 205, 0.45);
   border-radius: 50%;
   pointer-events: none;
   z-index: 5;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .square.hint-capture::after {
@@ -680,6 +701,19 @@ body {
   border-color: var(--text-gold);
   color: #fff;
   transform: translateY(-1px);
+}
+
+/* Grille PGN / FEN Outils */
+.pgn-tools-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-sm {
+  padding: 8px 10px;
+  font-size: 0.8rem;
 }
 
 /* Tableau d'Historique */
@@ -951,6 +985,29 @@ body {
 
 .rules-content strong {
   color: var(--text-main);
+}
+
+/* Notification Toast */
+.toast-notification {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--accent-gold);
+  color: var(--text-main);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+  font-size: 0.9rem;
+  font-weight: 600;
+  z-index: 2000;
+  transition: all 0.25s ease;
+}
+
+.toast-notification.hidden {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
 }
 
 /* ---------------- Pied de Page ---------------- */
