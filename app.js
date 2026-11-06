@@ -826,7 +826,9 @@
       this.hintMove = null; // Coup conseillé par le Guide Apprenti
       this.pendingPromotion = null;
       this.isAiThinking = false;
+      this.isAnimatingMove = false;
       this.aiTimer = null;
+      this.animTimer = null;
       this.toastTimer = null;
       this.illegalAnimTimer = null;
 
@@ -1010,7 +1012,7 @@
     }
 
     askCoachHint() {
-      if (this.isAiThinking || this.game.game_over()) return;
+      if (this.isAiThinking || this.isAnimatingMove || this.game.game_over()) return;
 
       const bestMove = this.ai.getBestMove(this.game, 3);
       if (!bestMove) return;
@@ -1111,6 +1113,13 @@
         // Surbrillance du dernier coup
         if (this.lastMove && (sqName === this.lastMove.from || sqName === this.lastMove.to)) {
           sq.classList.add('last-move');
+          if (this.lastMove.isOpponent) {
+            if (sqName === this.lastMove.from) {
+              sq.classList.add('opponent-last-move-from');
+            } else if (sqName === this.lastMove.to) {
+              sq.classList.add('opponent-last-move-to');
+            }
+          }
         }
 
         // Surbrillance d'un conseil du maître (Hint)
@@ -1158,6 +1167,15 @@
 
           sq.appendChild(pieceEl);
         }
+
+        // Indicateur spécial sur la case d'arrivée adverse (couleur & halo distincts)
+        if (this.lastMove && this.lastMove.isOpponent && sqName === this.lastMove.to) {
+          const indicator = document.createElement('div');
+          indicator.className = 'opponent-move-indicator';
+          indicator.title = `Dernier coup de l'adversaire : ${this.lastMove.san || sqName}`;
+          indicator.innerHTML = '<span class="opponent-pulse-ring"></span><span class="opponent-icon">⚡</span>';
+          sq.appendChild(indicator);
+        }
       });
 
       this.updateStatusAndUI();
@@ -1180,7 +1198,7 @@
     // Gestion des interactions utilisateur & Diagnostic Pédagogique
     // ------------------------------------------------------------------------
     handleSquareClick(squareName, event) {
-      if (this.isAiThinking || this.game.game_over()) return;
+      if (this.isAiThinking || this.isAnimatingMove || this.game.game_over()) return;
 
       const currentTurn = this.game.turn();
       const isPlayerTurn = (this.mode === 'pvp') || (currentTurn !== this.aiColor);
@@ -1258,7 +1276,7 @@
     }
 
     handleDragStart(squareName, event) {
-      if (this.isAiThinking || this.game.game_over()) {
+      if (this.isAiThinking || this.isAnimatingMove || this.game.game_over()) {
         event.preventDefault();
         return;
       }
@@ -1374,12 +1392,77 @@
       this.clearSelection();
     }
 
-    makeMove(moveObj) {
+    animatePieceMove(moveObj, isOpponent, callback) {
+      const fromSquare = moveObj.from;
+      const toSquare = moveObj.to;
+
+      const fromSq = this.dom.board.querySelector(`.square[data-square="${fromSquare}"]`);
+      const toSq = this.dom.board.querySelector(`.square[data-square="${toSquare}"]`);
+      const pieceEl = fromSq ? fromSq.querySelector('.piece') : null;
+
+      if (!pieceEl || !fromSq || !toSq) {
+        if (callback) callback();
+        return;
+      }
+
+      this.isAnimatingMove = true;
+
+      // Illuminer immédiatement les cases de départ et d'arrivée adverse
+      if (isOpponent) {
+        fromSq.classList.add('opponent-last-move-from');
+        toSq.classList.add('opponent-last-move-to');
+      }
+
+      const targetPieceEl = toSq.querySelector('.piece');
+      if (targetPieceEl) {
+        targetPieceEl.style.transition = 'opacity 250ms ease';
+        targetPieceEl.style.opacity = '0.35';
+      }
+
+      const fromRect = fromSq.getBoundingClientRect();
+      const toRect = toSq.getBoundingClientRect();
+      const deltaX = toRect.left - fromRect.left;
+      const deltaY = toRect.top - fromRect.top;
+
+      pieceEl.style.position = 'relative';
+      pieceEl.style.zIndex = '100';
+      pieceEl.style.pointerEvents = 'none';
+      pieceEl.style.transition = 'transform 360ms cubic-bezier(0.22, 1, 0.36, 1)';
+      pieceEl.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0)`;
+
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        this.isAnimatingMove = false;
+        if (this.animTimer) {
+          clearTimeout(this.animTimer);
+          this.animTimer = null;
+        }
+        pieceEl.removeEventListener('transitionend', finish);
+        if (callback) callback();
+      };
+
+      pieceEl.addEventListener('transitionend', finish);
+      this.animTimer = setTimeout(finish, 400);
+    }
+
+    makeMove(moveObj, isOpponent = false) {
+      const movingColor = this.game.turn();
       const moveResult = this.game.move(moveObj);
       if (!moveResult) return false;
 
+      const actuallyOpponent = Boolean(isOpponent || (this.mode === 'ai' && movingColor === this.aiColor));
+
       this.hintMove = null;
-      this.lastMove = { from: moveResult.from, to: moveResult.to };
+      this.lastMove = {
+        from: moveResult.from,
+        to: moveResult.to,
+        color: moveResult.color,
+        piece: moveResult.piece,
+        san: moveResult.san,
+        isOpponent: actuallyOpponent
+      };
 
       // Sons du jeu
       if (this.game.in_checkmate()) {
@@ -1394,6 +1477,10 @@
 
       // Retour pédagogique dans le Guide Apprenti
       const feedback = this.coach.getMoveSuccessFeedback(moveResult, this.game);
+      if (actuallyOpponent) {
+        feedback.title = `⚡ Coup de l'adversaire : ${moveResult.san}`;
+        feedback.text = `L'adversaire a joué son ${this.coach.getPieceName(moveResult.piece)} en ${moveResult.to.toUpperCase()}${moveResult.captured ? ` (prise en ${moveResult.to.toUpperCase()})` : ''}. Observez la case illuminée en cyan électrique !`;
+      }
       this.updateCoachMessage(feedback);
 
       this.render();
@@ -1411,18 +1498,26 @@
     }
 
     // ------------------------------------------------------------------------
-    // Tour de l'IA
+    // Tour de l'IA (Pacing ajusté + animation fluide pour que le joueur suive le coup)
     // ------------------------------------------------------------------------
     triggerAiMove() {
       if (this.aiTimer) {
         clearTimeout(this.aiTimer);
         this.aiTimer = null;
       }
+      if (this.animTimer) {
+        clearTimeout(this.animTimer);
+        this.animTimer = null;
+      }
+      this.isAnimatingMove = false;
 
       this.isAiThinking = true;
       this.updateStatusAndUI();
 
-      const thinkDelay = this.aiDifficulty === 3 ? 340 : 250;
+      // Délai de réflexion réaliste et posé (évite que le coup ne passe trop vite)
+      let thinkDelay = 750;
+      if (this.aiDifficulty === 2) thinkDelay = 950;
+      if (this.aiDifficulty === 3) thinkDelay = 1200;
 
       this.aiTimer = setTimeout(() => {
         this.aiTimer = null;
@@ -1436,7 +1531,10 @@
         this.isAiThinking = false;
 
         if (aiMove) {
-          this.makeMove(aiMove);
+          // Animation fluide de glissement de la pièce adverse
+          this.animatePieceMove(aiMove, true, () => {
+            this.makeMove(aiMove, true);
+          });
         } else {
           this.updateStatusAndUI();
         }
@@ -1452,6 +1550,11 @@
         this.aiTimer = null;
         this.isAiThinking = false;
       }
+      if (this.animTimer) {
+        clearTimeout(this.animTimer);
+        this.animTimer = null;
+      }
+      this.isAnimatingMove = false;
 
       const historyLen = this.game.history().length;
       if (historyLen === 0) {
@@ -1482,7 +1585,15 @@
       const history = this.game.history({ verbose: true });
       if (history.length > 0) {
         const prev = history[history.length - 1];
-        this.lastMove = { from: prev.from, to: prev.to };
+        const isOpponent = (this.mode === 'ai' && prev.color === this.aiColor);
+        this.lastMove = {
+          from: prev.from,
+          to: prev.to,
+          color: prev.color,
+          piece: prev.piece,
+          san: prev.san,
+          isOpponent
+        };
       } else {
         this.lastMove = null;
       }
@@ -1516,6 +1627,8 @@
 
       this.dom.playerTop.classList.toggle('active-turn', isTopActive);
       this.dom.playerBottom.classList.toggle('active-turn', isBottomActive);
+      this.dom.playerTop.classList.toggle('is-thinking', Boolean(isTopActive && this.isAiThinking));
+      this.dom.playerBottom.classList.toggle('is-thinking', Boolean(isBottomActive && this.isAiThinking));
 
       if (this.dom.avatarTop) {
         this.dom.avatarTop.textContent = (topColor === 'w') ? '♙' : '♟️';
@@ -1539,10 +1652,10 @@
       }
 
       if (isTopActive) {
-        this.dom.subTop.textContent = this.isAiThinking ? 'Réfléchit au prochain coup...' : 'Trait à ce joueur';
+        this.dom.subTop.textContent = this.isAiThinking ? 'Réfléchit au prochain coup... 🤔' : 'Trait à ce joueur';
         this.dom.subBottom.textContent = 'En attente';
       } else if (isBottomActive) {
-        this.dom.subBottom.textContent = this.isAiThinking ? 'Réfléchit au prochain coup...' : 'À vous de jouer';
+        this.dom.subBottom.textContent = this.isAiThinking ? 'Réfléchit au prochain coup... 🤔' : 'À vous de jouer';
         this.dom.subTop.textContent = 'En attente';
       } else {
         this.dom.subTop.textContent = 'Partie terminée';
@@ -1555,8 +1668,8 @@
         this.dom.statusBanner.className = 'status-banner alert';
         this.dom.statusBanner.classList.remove('hidden');
       } else if (this.isAiThinking) {
-        this.dom.statusBanner.textContent = `🤖 L'IA calcule le meilleur coup...`;
-        this.dom.statusBanner.className = 'status-banner';
+        this.dom.statusBanner.textContent = `🤖 L'adversaire réfléchit...`;
+        this.dom.statusBanner.className = 'status-banner thinking';
         this.dom.statusBanner.classList.remove('hidden');
       } else {
         this.dom.statusBanner.classList.add('hidden');
@@ -1756,6 +1869,11 @@
         clearTimeout(this.aiTimer);
         this.aiTimer = null;
       }
+      if (this.animTimer) {
+        clearTimeout(this.animTimer);
+        this.animTimer = null;
+      }
+      this.isAnimatingMove = false;
 
       this.game.reset();
       this.selectedSquare = null;

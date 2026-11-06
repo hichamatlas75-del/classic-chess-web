@@ -228,6 +228,17 @@ body {
   box-shadow: 0 0 20px rgba(212, 175, 55, 0.25), inset 0 0 10px rgba(212, 175, 55, 0.08);
 }
 
+.player-bar.is-thinking {
+  border-color: #0284c7;
+  background: rgba(2, 132, 199, 0.12);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.35), inset 0 0 10px rgba(56, 189, 248, 0.1);
+}
+
+.player-bar.is-thinking .player-sub {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
 .player-info {
   display: flex;
   align-items: center;
@@ -411,6 +422,87 @@ body {
   z-index: 2;
 }
 
+/* ---------------- Surbrillance Spéciale : Dernier Coup de l'Adversaire ---------------- */
+.square.opponent-last-move-from::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 182, 212, 0.28) !important;
+  box-shadow: inset 0 0 0 2.5px rgba(56, 189, 248, 0.9), inset 0 0 10px rgba(6, 182, 212, 0.35) !important;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.square.opponent-last-move-to::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 165, 233, 0.42) !important;
+  box-shadow: inset 0 0 0 3.5px #38bdf8, 0 0 18px rgba(56, 189, 248, 0.8), inset 0 0 14px rgba(6, 182, 212, 0.5) !important;
+  pointer-events: none;
+  z-index: 3;
+  animation: opponentPulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes opponentPulse {
+  0% {
+    box-shadow: inset 0 0 0 3px #38bdf8, 0 0 10px rgba(56, 189, 248, 0.5), inset 0 0 10px rgba(6, 182, 212, 0.35);
+  }
+  100% {
+    box-shadow: inset 0 0 0 4px #7dd3fc, 0 0 22px rgba(56, 189, 248, 0.95), inset 0 0 20px rgba(6, 182, 212, 0.7);
+  }
+}
+
+/* Badge indicateur discret et élégant sur la case d'arrivée adverse */
+.opponent-move-indicator {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 19px;
+  height: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border: 1.5px solid #7dd3fc;
+  border-radius: 50%;
+  font-size: 11px;
+  color: #ffffff;
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 10px rgba(56, 189, 248, 0.9);
+  animation: opponentBadgePop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.opponent-pulse-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.8);
+  animation: opponentRingWave 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes opponentBadgePop {
+  0% { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes opponentRingWave {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+@media (max-width: 600px) {
+  .opponent-move-indicator {
+    width: 15px;
+    height: 15px;
+    font-size: 9px;
+    top: 2px;
+    right: 2px;
+  }
+}
+
 .square.selected::before {
   content: "";
   position: absolute;
@@ -579,6 +671,19 @@ body {
   border-color: var(--accent-danger);
   color: #fca5a5;
   background: rgba(197, 48, 48, 0.2);
+}
+
+.status-banner.thinking {
+  border-color: #0284c7;
+  color: #7dd3fc;
+  background: rgba(2, 132, 199, 0.2);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+  animation: pulse-thinking 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-thinking {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.01); }
 }
 
 /* ---------------- Bouton Badge Mode Apprenti (Header) ---------------- */
