@@ -84,7 +84,7 @@
     ]
   };
 
-  const THEMES = ['theme-classic', 'theme-wood', 'theme-slate'];
+  const THEMES = ['theme-wood', 'theme-classic', 'theme-slate'];
 
   // --------------------------------------------------------------------------
   // 2. Gestionnaire Audio Web (Synthèse pure sans dépendances externes)
