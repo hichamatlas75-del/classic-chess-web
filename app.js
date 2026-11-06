@@ -326,7 +326,11 @@
   // --------------------------------------------------------------------------
   class ChessApp {
     constructor() {
-      this.game = new window.Chess();
+      const ChessConstructor = window.Chess || (typeof Chess !== 'undefined' ? Chess : null);
+      if (!ChessConstructor) {
+        throw new Error('Chess engine library not found on window or global scope!');
+      }
+      this.game = new ChessConstructor();
       this.ai = new ChessAI();
       this.audio = new ChessAudio();
 
@@ -444,7 +448,7 @@
           // Déterminer la couleur de la case
           const fileIdx = files.indexOf(file);
           const rankIdx = parseInt(rank, 10);
-          const isLight = (fileIdx + rankIdx) % 2 !== 0;
+          const isLight = (fileIdx + rankIdx) % 2 === 0;
           squareEl.classList.add(isLight ? 'light' : 'dark');
 
           // Écouteurs de clics et drag & drop
@@ -466,7 +470,10 @@
       squares.forEach(sq => {
         const sqName = sq.dataset.square;
         sq.innerHTML = '';
-        sq.className = 'square ' + (sq.classList.contains('light') ? 'light' : 'dark');
+        const fileIdx = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].indexOf(sqName[0]);
+        const rankIdx = parseInt(sqName[1], 10);
+        const isLight = (fileIdx + rankIdx) % 2 === 0;
+        sq.className = 'square ' + (isLight ? 'light' : 'dark');
 
         // Surbrillance du dernier coup
         if (this.lastMove && (sqName === this.lastMove.from || sqName === this.lastMove.to)) {
@@ -1084,9 +1091,19 @@
     }
   }
 
-  // Initialisation au chargement du DOM
-  window.addEventListener('DOMContentLoaded', () => {
-    window.chessApp = new ChessApp();
-  });
+  // Initialisation sécurisée au chargement du DOM
+  function initChess() {
+    try {
+      window.chessApp = new ChessApp();
+    } catch (err) {
+      console.error('ChessApp init error:', err);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initChess);
+  } else {
+    initChess();
+  }
 
 })();
