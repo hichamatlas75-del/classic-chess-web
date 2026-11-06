@@ -468,6 +468,55 @@ body {
   100% { transform: scale(1.02); opacity: 1; }
 }
 
+/* Surbrillance d'erreur pédagogique (Coup Illégal) */
+.square.illegal-target::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(220, 38, 38, 0.55);
+  box-shadow: inset 0 0 0 3px #ef4444, inset 0 0 14px rgba(239, 68, 68, 0.8);
+  pointer-events: none;
+  z-index: 6;
+}
+
+.square.illegal-shake {
+  animation: shake-error 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake-error {
+  10%, 90% { transform: translate3d(-2px, 0, 0); }
+  20%, 80% { transform: translate3d(4px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+  40%, 60% { transform: translate3d(5px, 0, 0); }
+}
+
+/* Surbrillance de Conseil du Maître (Hint) */
+.square.coach-hint-from::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 185, 129, 0.42);
+  box-shadow: inset 0 0 0 3px #10b981;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.square.coach-hint-to::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 185, 129, 0.55);
+  box-shadow: inset 0 0 0 3.5px #34d399, inset 0 0 14px rgba(16, 185, 129, 0.8);
+  pointer-events: none;
+  z-index: 4;
+  animation: pulse-hint 1s infinite alternate;
+}
+
+@keyframes pulse-hint {
+  0% { opacity: 0.75; }
+  100% { opacity: 1; }
+}
+
 /* ---------------- Pièces Façon Sculpture Bois (Buis & Ébène) ---------------- */
 .piece {
   width: 90%;
@@ -532,11 +581,42 @@ body {
   background: rgba(197, 48, 48, 0.2);
 }
 
-/* ---------------- Panneau Latéral (Sidebar) ---------------- */
+/* ---------------- Bouton Badge Mode Apprenti (Header) ---------------- */
+.btn-coach-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 0 13px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.btn-coach-badge.active {
+  background: rgba(212, 175, 55, 0.18);
+  border-color: var(--accent-gold);
+  color: var(--text-gold);
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.25);
+}
+
+.btn-coach-badge:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-gold);
+  color: #fff;
+}
+
+/* ---------------- Panneau Latéral (Sidebar) & Carte Coach Apprenti ---------------- */
 .sidebar-section {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
 }
 
 .panel-card {
@@ -544,8 +624,136 @@ body {
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 18px 22px;
+  padding: 16px 20px;
   box-shadow: var(--shadow-main);
+}
+
+/* Carte du Guide d'Aide Apprenti */
+.coach-card {
+  border: 1.5px solid rgba(212, 175, 55, 0.45);
+  background: linear-gradient(145deg, #27180f 0%, #1c110a 100%);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.coach-card.hidden {
+  display: none;
+}
+
+.coach-card.coach-error {
+  border-color: #ef4444;
+  background: linear-gradient(145deg, #2d1212 0%, #1d0b0b 100%);
+  box-shadow: 0 0 22px rgba(239, 68, 68, 0.3);
+}
+
+.coach-card.coach-success {
+  border-color: #10b981;
+  background: linear-gradient(145deg, #10271e 0%, #0b1a14 100%);
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.25);
+}
+
+.coach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(223, 190, 139, 0.14);
+}
+
+.coach-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.coach-avatar {
+  font-size: 1.65rem;
+  width: 38px;
+  height: 38px;
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coach-title-group h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: "Georgia", serif;
+  color: var(--text-gold);
+}
+
+.coach-subtitle {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.btn-hint {
+  background: linear-gradient(180deg, #d4af37 0%, #aa821c 100%);
+  color: #130c08;
+  border: 1px solid #f3d474;
+  border-radius: var(--radius-sm);
+  padding: 6px 11px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.35);
+}
+
+.btn-hint:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.5);
+}
+
+.coach-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coach-message-title {
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.coach-card.coach-error .coach-message-title {
+  color: #fca5a5;
+}
+
+.coach-card.coach-success .coach-message-title {
+  color: #6ee7b7;
+}
+
+.coach-message-text {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-main);
+}
+
+.coach-rule-tag {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-gold);
+  background: rgba(0, 0, 0, 0.32);
+  border-left: 3px solid var(--accent-gold);
+  padding: 6px 10px;
+  border-radius: 0 6px 6px 0;
+  margin-top: 2px;
+}
+
+.coach-card.coach-error .coach-rule-tag {
+  border-left-color: #ef4444;
+  color: #fecaca;
 }
 
 .card-header {

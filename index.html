@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Échecs Classiques - Jeu FIDE & IA Solo</title>
-  <meta name="description" content="Jeu d'échecs classique complet selon les règles FIDE officielles. Mode 2 joueurs et IA solo, responsive, moderne et élégant.">
+  <title>Échecs Classiques - Jeu FIDE, IA Solo & Guide Apprenti</title>
+  <meta name="description" content="Jeu d'échecs classique complet selon les règles FIDE officielles. Mode 2 joueurs, IA solo et Guide d'Aide Intelligent pour les apprentis.">
   <link rel="icon" type="image/svg+xml" href="assets/pieces/wK.svg">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -25,6 +25,10 @@
       </div>
 
       <div class="header-actions">
+        <button id="btn-coach-toggle" class="btn-coach-badge active" title="Activer / Désactiver le Guide d'Aide Apprenti" aria-label="Mode Apprenti">
+          <span>🎓</span>
+          <span class="coach-badge-label">Guide Apprenti : ON</span>
+        </button>
         <button id="btn-sound" class="btn-icon" title="Activer / Désactiver le son" aria-label="Son">
           <span id="sound-icon">🔊</span>
         </button>
@@ -87,8 +91,32 @@
         <div id="game-status-banner" class="status-banner hidden"></div>
       </section>
 
-      <!-- Panneau Latéral de Contrôle & Historique -->
+      <!-- Panneau Latéral de Contrôle, Guide Apprenti & Historique -->
       <aside class="sidebar-section">
+        <!-- Carte Guide d'Aide Intelligent (Mode Apprenti) -->
+        <div class="panel-card coach-card" id="coach-panel">
+          <div class="coach-header">
+            <div class="coach-title-group">
+              <span class="coach-avatar" id="coach-icon">🎓</span>
+              <div>
+                <h2>Guide d'Aide Apprenti</h2>
+                <span class="coach-subtitle" id="coach-status">Assistant pédagogique interactif</span>
+              </div>
+            </div>
+            <button id="btn-hint" class="btn-hint" title="Demander un conseil ou le meilleur coup au maître">
+              💡 Conseil
+            </button>
+          </div>
+
+          <div class="coach-body" id="coach-body">
+            <div class="coach-message-title" id="coach-msg-title">Bienvenue à l'Académie !</div>
+            <p class="coach-message-text" id="coach-msg-text">
+              Sélectionnez une pièce pour découvrir sa règle de déplacement. Si vous tentez un coup interdit (avec un pion ou toute autre pièce), je vous expliquerai précisément la cause !
+            </p>
+            <div class="coach-rule-tag" id="coach-rule-tag">📖 Règle FIDE : Les Blancs commencent toujours la partie.</div>
+          </div>
+        </div>
+
         <!-- Carte Statut & Mode -->
         <div class="panel-card game-control-card">
           <div class="card-header">
@@ -238,7 +266,7 @@
 
     <!-- Pied de page -->
     <footer class="app-footer">
-      <p>Jeu d'échecs classique open source &bull; Conçu avec Vanilla JS & SVG Vectoriels &bull; Règles FIDE</p>
+      <p>Jeu d'échecs classique open source &bull; Conçu avec Vanilla JS & SVG Vectoriels &bull; Règles FIDE & Guide Apprenti</p>
     </footer>
   </div>
 
