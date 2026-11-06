@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Échecs Classiques - Jeu FIDE & IA Solo</title>
+  <meta name="description" content="Jeu d'échecs classique complet selon les règles FIDE officielles. Mode 2 joueurs et IA solo, responsive, moderne et élégant.">
+  <link rel="icon" type="image/svg+xml" href="assets/pieces/wK.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- En-tête -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-icon">
+          <svg viewBox="0 0 45 45" class="icon-svg">
+            <path d="M22.5 11.63V6M20 8h5M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5M11.5 37c5.5 3.5 15.5 3.5 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10z" fill="none" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>Échecs Classiques</h1>
+          <span class="badge-fide">Règles Officielles FIDE</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-sound" class="btn-icon" title="Activer / Désactiver le son" aria-label="Son">
+          <span id="sound-icon">🔊</span>
+        </button>
+        <button id="btn-theme" class="btn-icon" title="Changer le thème de l'échiquier" aria-label="Thème">
+          🎨
+        </button>
+        <button id="btn-rules" class="btn-icon" title="Règles du jeu" aria-label="Règles">
+          ℹ️
+        </button>
+      </div>
+    </header>
+
+    <!-- Contenu principal -->
+    <main class="main-content">
+      <!-- Section Échiquier -->
+      <section class="board-section">
+        <!-- Bandeau Joueur du Haut (Noirs par défaut) -->
+        <div class="player-bar" id="player-top">
+          <div class="player-info">
+            <div class="player-avatar" id="avatar-top">♟️</div>
+            <div class="player-meta">
+              <span class="player-name" id="name-top">Joueur 2 (Noirs)</span>
+              <span class="player-sub" id="sub-top">Au repos</span>
+            </div>
+          </div>
+          <div class="captured-group" id="captured-top">
+            <div class="captured-list" id="captured-top-pieces"></div>
+            <span class="material-advantage" id="adv-top"></span>
+          </div>
+        </div>
+
+        <!-- Zone du Plateau avec Coordonnées -->
+        <div class="board-wrapper">
+          <!-- Coordonnées Rank (1-8) Gauche -->
+          <div class="coords-rank" id="coords-rank-left"></div>
+
+          <!-- L'échiquier 8x8 -->
+          <div id="chessboard" class="chessboard theme-classic" role="grid" aria-label="Échiquier de jeu d'échecs"></div>
+
+          <!-- Coordonnées Files (A-H) Bas -->
+          <div class="coords-file" id="coords-file-bottom"></div>
+        </div>
+
+        <!-- Bandeau Joueur du Bas (Blancs par défaut) -->
+        <div class="player-bar" id="player-bottom">
+          <div class="player-info">
+            <div class="player-avatar" id="avatar-bottom">♙</div>
+            <div class="player-meta">
+              <span class="player-name" id="name-bottom">Joueur 1 (Blancs)</span>
+              <span class="player-sub" id="sub-bottom">Trait aux Blancs</span>
+            </div>
+          </div>
+          <div class="captured-group" id="captured-bottom">
+            <div class="captured-list" id="captured-bottom-pieces"></div>
+            <span class="material-advantage" id="adv-bottom"></span>
+          </div>
+        </div>
+
+        <!-- Alerte Échec / Tour en direct pour mobile -->
+        <div id="game-status-banner" class="status-banner hidden"></div>
+      </section>
+
+      <!-- Panneau Latéral de Contrôle & Historique -->
+      <aside class="sidebar-section">
+        <!-- Carte Statut & Mode -->
+        <div class="panel-card game-control-card">
+          <div class="card-header">
+            <h2>Mode de Jeu</h2>
+          </div>
+          <div class="mode-selector">
+            <button class="mode-btn active" data-mode="ai" id="mode-ai-btn">
+              <span class="mode-icon">🤖</span>
+              <span>Solo vs IA</span>
+            </button>
+            <button class="mode-btn" data-mode="pvp" id="mode-pvp-btn">
+              <span class="mode-icon">👥</span>
+              <span>2 Joueurs</span>
+            </button>
+          </div>
+
+          <!-- Options IA -->
+          <div class="ai-options" id="ai-options">
+            <div class="option-row">
+              <label for="ai-difficulty">Niveau IA :</label>
+              <select id="ai-difficulty" class="custom-select">
+                <option value="1">Débutant (Facile)</option>
+                <option value="2" selected>Intermédiaire (Tactique)</option>
+                <option value="3">Avancé (MiniMax & Élagage α-β)</option>
+              </select>
+            </div>
+            <div class="option-row">
+              <label for="ai-side">Vous jouez :</label>
+              <select id="ai-side" class="custom-select">
+                <option value="w" selected>Les Blancs (Premier coup)</option>
+                <option value="b">Les Noirs (Second coup)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Boutons Principaux d'Action -->
+          <div class="action-buttons-grid">
+            <button id="btn-new-game" class="btn btn-primary">
+              <span class="btn-icon-text">✨</span> Nouvelle Partie
+            </button>
+            <button id="btn-undo" class="btn btn-secondary" title="Annuler le dernier coup">
+              <span class="btn-icon-text">↩️</span> Annuler
+            </button>
+            <button id="btn-flip" class="btn btn-secondary" title="Tourner l'échiquier à 180°">
+              <span class="btn-icon-text">🔄</span> Tourner
+            </button>
+          </div>
+        </div>
+
+        <!-- Historique des Coups -->
+        <div class="panel-card history-card">
+          <div class="card-header">
+            <h2>Historique des Coups (SAN)</h2>
+            <span class="move-counter" id="move-counter">0 coups</span>
+          </div>
+          <div class="history-table-wrapper" id="history-container">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th class="th-num">#</th>
+                  <th class="th-white">Blancs</th>
+                  <th class="th-black">Noirs</th>
+                </tr>
+              </thead>
+              <tbody id="history-tbody">
+                <!-- Rempli dynamiquement -->
+              </tbody>
+            </table>
+            <div id="history-empty" class="history-empty">Aucun coup joué. Les Blancs commencent !</div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Modal Promotion de Pion -->
+    <div id="modal-promotion" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="promo-title">
+      <div class="modal-card promotion-card">
+        <h3 id="promo-title">Promotion du Pion</h3>
+        <p>Choisissez la pièce que vous souhaitez promouvoir :</p>
+        <div class="promotion-choices" id="promotion-choices">
+          <button class="promo-btn" data-piece="q" title="Dame">
+            <div class="promo-icon" id="promo-q"></div>
+            <span>Dame</span>
+          </button>
+          <button class="promo-btn" data-piece="r" title="Tour">
+            <div class="promo-icon" id="promo-r"></div>
+            <span>Tour</span>
+          </button>
+          <button class="promo-btn" data-piece="b" title="Fou">
+            <div class="promo-icon" id="promo-b"></div>
+            <span>Fou</span>
+          </button>
+          <button class="promo-btn" data-piece="n" title="Cavalier">
+            <div class="promo-icon" id="promo-n"></div>
+            <span>Cavalier</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Fin de Partie -->
+    <div id="modal-gameover" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gameover-title">
+      <div class="modal-card gameover-card">
+        <div class="gameover-trophy" id="gameover-icon">🏆</div>
+        <h2 id="gameover-title">Échec et Mat !</h2>
+        <p id="gameover-desc" class="gameover-desc">Les Blancs remportent la partie par échec et mat.</p>
+        <div class="gameover-stats" id="gameover-stats"></div>
+        <div class="gameover-actions">
+          <button id="btn-gameover-restart" class="btn btn-primary">Rejouer une partie</button>
+          <button id="btn-gameover-close" class="btn btn-secondary">Voir l'échiquier final</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Règles FIDE -->
+    <div id="modal-rules" class="modal-overlay hidden" role="dialog" aria-modal="true">
+      <div class="modal-card rules-card">
+        <div class="rules-header">
+          <h3>Règles Officielles FIDE Implémentées</h3>
+          <button id="btn-rules-close" class="btn-icon" aria-label="Fermer">✕</button>
+        </div>
+        <div class="rules-content">
+          <ul>
+            <li><strong>Déplacements standards :</strong> Roi (1 case toutes directions), Dame (toutes directions), Tour (lignes/colonnes), Fou (diagonales), Cavalier (en L, saute par-dessus les pièces), Pion (avance d'1 case, ou 2 cases au premier coup, capture en diagonale).</li>
+            <li><strong>Le Roque :</strong> Petit (O-O) et Grand roque (O-O-O) autorisés si le roi et la tour n'ont jamais bougé, aucune pièce ne s'interpose, et aucune case traversée n'est attaquée.</li>
+            <li><strong>Prise en Passant :</strong> Lorsqu'un pion adverse avance de deux cases et se retrouve adjacent au vôtre, vous pouvez le capturer immédiatement au coup suivant comme s'il n'avait avancé que d'une seule case.</li>
+            <li><strong>Promotion du Pion :</strong> Tout pion atteignant la dernière rangée adverse est immédiatement transformé en Dame, Tour, Fou ou Cavalier.</li>
+            <li><strong>Échec et Mat :</strong> Le roi est attaqué et aucun coup légal ne permet d'échapper à la menace. Victoire immédiate.</li>
+            <li><strong>Pat & Nulle :</strong> Le joueur au trait n'a aucun coup légal et son roi n'est pas en échec (Pat). Nulle également par répétition triple, règle des 50 coups sans capture ni pion poussé, ou matériel insuffisant.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pied de page -->
+    <footer class="app-footer">
+      <p>Jeu d'échecs classique open source &bull; Conçu avec Vanilla JS & SVG Vectoriels &bull; Règles FIDE</p>
+    </footer>
+  </div>
+
+  <!-- Scripts -->
+  <script src="chess.js"></script>
+  <script src="pieces.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
