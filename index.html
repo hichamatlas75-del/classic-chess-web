@@ -4,8 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Échecs Classiques - Jeu FIDE, IA Solo & Guide Apprenti</title>
-  <meta name="description" content="Jeu d'échecs classique complet selon les règles FIDE officielles. Mode 2 joueurs, IA solo et Guide d'Aide Intelligent pour les apprentis.">
-  <link rel="icon" type="image/svg+xml" href="assets/pieces/wK.svg">
+  <meta name="description" content="Jeu d'échecs classique complet selon les règles FIDE officielles. Mode 2 joueurs, IA solo, pendule d'échecs, anti-veille et PWA hors-ligne.">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/icon.svg">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2a150b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Échecs">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -29,11 +36,17 @@
           <span>🎓</span>
           <span class="coach-badge-label">Guide Apprenti : ON</span>
         </button>
+        <button id="btn-wakelock" class="btn-icon active" title="Mode Anti-veille d'écran (Écran maintenu allumé)" aria-label="Anti-veille">
+          <span id="wakelock-icon">👁️</span>
+        </button>
         <button id="btn-sound" class="btn-icon" title="Activer / Désactiver le son" aria-label="Son">
           <span id="sound-icon">🔊</span>
         </button>
         <button id="btn-theme" class="btn-icon" title="Changer le thème de l'échiquier" aria-label="Thème">
           🎨
+        </button>
+        <button id="btn-install" class="btn-icon hidden" title="Installer l'application sur votre appareil (PWA)" aria-label="Installer l'application">
+          <span>📲</span>
         </button>
         <button id="btn-rules" class="btn-icon" title="Règles du jeu" aria-label="Règles">
           ℹ️
@@ -54,9 +67,15 @@
               <span class="player-sub" id="sub-top">Au repos</span>
             </div>
           </div>
-          <div class="captured-group" id="captured-top">
-            <div class="captured-list" id="captured-top-pieces"></div>
-            <span class="material-advantage" id="adv-top"></span>
+          <div class="player-bar-right">
+            <div class="captured-group" id="captured-top">
+              <div class="captured-list" id="captured-top-pieces"></div>
+              <span class="material-advantage" id="adv-top"></span>
+            </div>
+            <div class="player-clock" id="clock-top" aria-label="Horloge joueur haut" title="Temps restant">
+              <span class="clock-icon">⏱️</span>
+              <span class="clock-time" id="time-top">10:00</span>
+            </div>
           </div>
         </div>
 
@@ -81,9 +100,15 @@
               <span class="player-sub" id="sub-bottom">Trait aux Blancs</span>
             </div>
           </div>
-          <div class="captured-group" id="captured-bottom">
-            <div class="captured-list" id="captured-bottom-pieces"></div>
-            <span class="material-advantage" id="adv-bottom"></span>
+          <div class="player-bar-right">
+            <div class="captured-group" id="captured-bottom">
+              <div class="captured-list" id="captured-bottom-pieces"></div>
+              <span class="material-advantage" id="adv-bottom"></span>
+            </div>
+            <div class="player-clock active" id="clock-bottom" aria-label="Horloge joueur bas" title="Temps restant">
+              <span class="clock-icon">⏱️</span>
+              <span class="clock-time" id="time-bottom">10:00</span>
+            </div>
           </div>
         </div>
 
@@ -150,6 +175,19 @@
                 <option value="b">Les Noirs (Second coup)</option>
               </select>
             </div>
+          </div>
+
+          <!-- Cadence de l'Horloge (Pendule d'échecs) -->
+          <div class="option-row clock-option-row">
+            <label for="time-control-select">⏱️ Horloge :</label>
+            <select id="time-control-select" class="custom-select">
+              <option value="600" selected>10 min (Rapide - Standard)</option>
+              <option value="300">5 min (Blitz)</option>
+              <option value="180">3 min (Bullet)</option>
+              <option value="900_10">15 min + 10s (Compétition)</option>
+              <option value="1800">30 min (Classique)</option>
+              <option value="0">Illimité (Chronomètre libre)</option>
+            </select>
           </div>
 
           <!-- Boutons Principaux d'Action -->

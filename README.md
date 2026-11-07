@@ -51,7 +51,10 @@ Accessible et jouable directement en ligne sur n'importe quel navigateur (deskto
   - ↩️ **Annuler le coup (Undo) :** retour en arrière instantané (annule le coup du joueur et de l'IA en mode solo).
   - 📜 **Historique des coups :** notation algébrique standard (SAN : ex. `e4`, `Nf3`, `O-O`) avec défilement automatique.
   - ⚔️ **Pièces capturées & Avantage matériel :** décompte en temps réel des pièces sorties et affichage du différentiel (ex. `+3`).
-  - 🔊 **Effets sonores immersifs :** synthèse audio pure via Web Audio API (déplacement, capture, échec, victoire) sans téléchargement de fichiers lourds.
+  - ⏱️ **Pendule / Horloge d'Échecs Digitale :** cadences officielles FIDE (Blitz 3 min, 5 min, Rapide 10 min, Compétition 15 min + 10s d'incrément, Classique 30 min, ou Chronomètre libre illimité). Gestion stricte de la défaite au temps et nulle en cas de matériel insuffisant.
+  - 👁️ **Mode Anti-Veille (Screen Wake Lock API) :** empêche automatiquement la mise en veille ou l'extinction de l'écran pendant vos parties sur smartphone, tablette ou ordinateur.
+  - 📲 **Progressive Web App (PWA) :** installable en tant qu'application native sur Android, iOS, Windows et macOS avec support complet du jeu hors-ligne via Service Worker.
+  - 🔊 **Effets sonores immersifs :** synthèse audio pure via Web Audio API (déplacement, capture, échec, alerte temps, victoire) sans téléchargement de fichiers lourds.
   - 📱 **Design 100% Responsive :** optimisé pour écrans tactiles mobiles (tap-to-move et drag & drop).
 
 ---
@@ -60,15 +63,16 @@ Accessible et jouable directement en ligne sur n'importe quel navigateur (deskto
 
 ```
 classic-chess-web/
-├── index.html        # Structure sémantique HTML5, échiquier, bandeaux et modales
-├── style.css         # Thème sombre élégant, styles de l'échiquier, responsive design
-├── app.js            # Logique applicative, contrôleur de jeu, moteur IA MiniMax, audio
+├── index.html        # Structure sémantique HTML5, échiquier, pendules et modales
+├── style.css         # Thème bois de luxe, pendule digitale DGT, responsive design
+├── app.js            # Contrôleur de jeu, horloges d'échecs, anti-veille, moteur IA, coach
 ├── chess.js          # Moteur FIDE certifié (génération et validation des coups légaux)
 ├── pieces.js         # Intégration optimisée des 12 pièces SVG vectorielles
+├── sw.js             # Service Worker PWA (mise en cache et fonctionnement hors-ligne)
+├── manifest.json     # Manifeste PWA pour installation sur mobile et desktop
 ├── assets/
+│   ├── icons/        # Icônes PWA haute résolution (192x192, 512x512, maskable, SVG)
 │   └── pieces/       # Fichiers SVG individuels des pièces (cburnett Staunton)
-│       ├── wK.svg, wQ.svg, wR.svg, wB.svg, wN.svg, wP.svg
-│       └── bK.svg, bQ.svg, bR.svg, bB.svg, bN.svg, bP.svg
 └── README.md         # Documentation complète du projet
 ```
 

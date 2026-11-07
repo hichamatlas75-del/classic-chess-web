@@ -313,6 +313,81 @@ body {
   display: none;
 }
 
+/* Zone Droite du Bandeau Joueur (Captures + Horloge) */
+.player-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Pendule / Horloge d'Échecs Digitale Haute Précision */
+.player-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #110905;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.4) 100%);
+  border: 1.5px solid rgba(212, 175, 55, 0.35);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #c4b5a0;
+  letter-spacing: 0.5px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.player-clock .clock-icon {
+  font-size: 0.88rem;
+  opacity: 0.85;
+}
+
+.player-clock.active {
+  color: #fbbf24;
+  background: #1e0e06;
+  border-color: #f59e0b;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.4), inset 0 0 8px rgba(245, 158, 11, 0.2);
+}
+
+.player-clock.active .clock-icon {
+  animation: clockTickIcon 1s infinite steps(1);
+}
+
+@keyframes clockTickIcon {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.92); }
+}
+
+/* Alerte Moins de 30 secondes */
+.player-clock.low-time {
+  color: #f59e0b;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.16);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.5);
+}
+
+/* Alerte Critique Moins de 10 secondes */
+.player-clock.critical-time {
+  color: #f87171 !important;
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.22) !important;
+  animation: clockPanic 0.75s infinite alternate !important;
+}
+
+@keyframes clockPanic {
+  0% {
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.9);
+    transform: scale(1.04);
+  }
+}
+
 /* --------------------------------------------------------------------------
    Cadre de l'échiquier façon Noyer Massif & Inclusions de Marqueterie Dorée
    -------------------------------------------------------------------------- */
@@ -715,6 +790,35 @@ body {
   transform: translateY(-1px);
   border-color: var(--accent-gold);
   color: #fff;
+}
+
+/* Bouton Anti-Veille (Écran Allumé) */
+#btn-wakelock.active {
+  border-color: #f59e0b;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.15);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+}
+
+/* Bouton Installation PWA */
+#btn-install {
+  border-color: #10b981;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.15);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+  animation: pulseInstall 2.2s infinite ease-in-out;
+}
+
+@keyframes pulseInstall {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); box-shadow: 0 0 18px rgba(16, 185, 129, 0.7); }
+}
+
+/* Ligne option Horloge */
+.clock-option-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(212, 175, 55, 0.25);
 }
 
 /* ---------------- Panneau Latéral (Sidebar) & Carte Coach Apprenti ---------------- */
@@ -1398,6 +1502,26 @@ body {
 
   .panel-card {
     padding: 14px 16px;
+  }
+
+  .player-bar {
+    padding: 8px 10px;
+  }
+
+  .player-bar-right {
+    gap: 8px;
+  }
+
+  .player-clock {
+    font-size: 0.88rem;
+    padding: 3px 8px;
+    letter-spacing: 0.2px;
+  }
+
+  .captured-piece-img {
+    width: 18px;
+    height: 18px;
+    margin-right: -6px;
   }
 
   .history-table-wrapper {

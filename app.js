@@ -203,6 +203,15 @@
         setTimeout(() => this.playTone(freq, 0.4, 'triangle', 0.2), i * 130);
       });
     }
+
+    playClockTick() {
+      this.playTone(880, 0.03, 'sine', 0.06);
+    }
+
+    playTimeout() {
+      this.playTone(380, 0.18, 'sawtooth', 0.22);
+      setTimeout(() => this.playTone(260, 0.35, 'sawtooth', 0.25), 150);
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -800,6 +809,248 @@
   }
 
   // --------------------------------------------------------------------------
+  // 4.1 Gestionnaire Anti-Veille (Screen Wake Lock API)
+  // --------------------------------------------------------------------------
+  class ScreenWakeLock {
+    constructor(onChange = () => {}) {
+      this.isSupported = ('wakeLock' in navigator);
+      this.enabled = true;
+      this.lock = null;
+      this.onChange = onChange;
+
+      try {
+        const saved = localStorage.getItem('chess_wakelock');
+        if (saved !== null) {
+          this.enabled = (saved === 'true');
+        }
+      } catch (_) {}
+
+      if (this.isSupported) {
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible' && this.enabled) {
+            this.acquire();
+          }
+        });
+      }
+    }
+
+    async acquire() {
+      if (!this.isSupported || !this.enabled || this.lock) return;
+      try {
+        this.lock = await navigator.wakeLock.request('screen');
+        this.lock.addEventListener('release', () => {
+          this.lock = null;
+          this.onChange(this.getState());
+        });
+        this.onChange(this.getState());
+      } catch (err) {
+        // Silencieux si refusé par politique navigateur
+      }
+    }
+
+    async release() {
+      if (this.lock) {
+        try {
+          await this.lock.release();
+        } catch (_) {}
+        this.lock = null;
+        this.onChange(this.getState());
+      }
+    }
+
+    toggle() {
+      this.enabled = !this.enabled;
+      try {
+        localStorage.setItem('chess_wakelock', String(this.enabled));
+      } catch (_) {}
+
+      if (this.enabled) {
+        this.acquire();
+      } else {
+        this.release();
+      }
+      this.onChange(this.getState());
+      return this.enabled;
+    }
+
+    getState() {
+      return {
+        isSupported: this.isSupported,
+        enabled: this.enabled,
+        isActive: Boolean(this.lock)
+      };
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 4.2 Horloge d'Échecs & Pendule Digitale (Cadences FIDE & Chronomètre)
+  // --------------------------------------------------------------------------
+  class ChessClock {
+    constructor(options = {}) {
+      this.initialTime = options.initialTime ?? 600; // secondes, 10 min par défaut
+      this.increment = options.increment ?? 0; // incrément en secondes
+      this.whiteTime = this.initialTime;
+      this.blackTime = this.initialTime;
+      this.activeColor = null;
+      this.isRunning = false;
+      this.lastTickTime = null;
+      this.timerId = null;
+      this.onTick = options.onTick || (() => {});
+      this.onTimeout = options.onTimeout || (() => {});
+    }
+
+    setTimeControl(valueStr) {
+      this.stop();
+      if (typeof valueStr === 'string' && valueStr.includes('_')) {
+        const parts = valueStr.split('_');
+        this.initialTime = parseInt(parts[0], 10);
+        this.increment = parseInt(parts[1], 10);
+      } else {
+        this.initialTime = parseInt(valueStr, 10) || 0;
+        this.increment = 0;
+      }
+      this.reset();
+    }
+
+    reset() {
+      this.stop();
+      this.whiteTime = this.initialTime;
+      this.blackTime = this.initialTime;
+      this.activeColor = null;
+      this.isRunning = false;
+      this.onTick(this.getState());
+    }
+
+    start(turn = 'w') {
+      this.activeColor = turn;
+      this.isRunning = true;
+      this.lastTickTime = performance.now();
+      if (this.timerId) clearInterval(this.timerId);
+      this.timerId = setInterval(() => this.tick(), 100);
+      this.onTick(this.getState());
+    }
+
+    switchTurn(newTurn) {
+      if (!this.isRunning) {
+        this.start(newTurn);
+        return;
+      }
+
+      // Ajout de l'incrément au joueur dont le coup s'achève
+      if (this.initialTime > 0 && this.increment > 0 && this.activeColor) {
+        if (this.activeColor === 'w') {
+          this.whiteTime += this.increment;
+        } else if (this.activeColor === 'b') {
+          this.blackTime += this.increment;
+        }
+      }
+
+      this.activeColor = newTurn;
+      this.lastTickTime = performance.now();
+      this.onTick(this.getState());
+    }
+
+    pause() {
+      this.isRunning = false;
+      if (this.timerId) {
+        clearInterval(this.timerId);
+        this.timerId = null;
+      }
+      this.onTick(this.getState());
+    }
+
+    resume() {
+      if (this.activeColor && !this.isRunning) {
+        this.isRunning = true;
+        this.lastTickTime = performance.now();
+        if (this.timerId) clearInterval(this.timerId);
+        this.timerId = setInterval(() => this.tick(), 100);
+        this.onTick(this.getState());
+      }
+    }
+
+    stop() {
+      this.isRunning = false;
+      if (this.timerId) {
+        clearInterval(this.timerId);
+        this.timerId = null;
+      }
+    }
+
+    tick() {
+      if (!this.isRunning || !this.activeColor) return;
+      const now = performance.now();
+      const delta = (now - this.lastTickTime) / 1000;
+      this.lastTickTime = now;
+
+      if (this.initialTime === 0) {
+        // Chronomètre montant
+        if (this.activeColor === 'w') {
+          this.whiteTime += delta;
+        } else {
+          this.blackTime += delta;
+        }
+      } else {
+        // Compte à rebours
+        if (this.activeColor === 'w') {
+          this.whiteTime = Math.max(0, this.whiteTime - delta);
+          if (this.whiteTime <= 0) {
+            this.stop();
+            this.onTick(this.getState());
+            this.onTimeout('w');
+            return;
+          }
+        } else {
+          this.blackTime = Math.max(0, this.blackTime - delta);
+          if (this.blackTime <= 0) {
+            this.stop();
+            this.onTick(this.getState());
+            this.onTimeout('b');
+            return;
+          }
+        }
+      }
+
+      this.onTick(this.getState());
+    }
+
+    getState() {
+      return {
+        whiteTime: this.whiteTime,
+        blackTime: this.blackTime,
+        activeColor: this.activeColor,
+        isRunning: this.isRunning,
+        isUnlimited: this.initialTime === 0,
+        whiteFormatted: this.formatTime(this.whiteTime),
+        blackFormatted: this.formatTime(this.blackTime)
+      };
+    }
+
+    formatTime(seconds) {
+      if (isNaN(seconds) || seconds < 0) seconds = 0;
+      const s = Math.floor(seconds);
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      const mm = String(m).padStart(2, '0');
+      const ss = String(sec).padStart(2, '0');
+
+      // Pour moins de 10 secondes en compte à rebours, afficher les dixièmes
+      if (this.initialTime > 0 && seconds < 10 && seconds > 0) {
+        const tenths = Math.floor((seconds - s) * 10);
+        return `${m}:${ss}.${tenths}`;
+      }
+
+      if (m >= 60) {
+        const h = Math.floor(m / 60);
+        const remM = m % 60;
+        return `${h}:${String(remM).padStart(2, '0')}:${ss}`;
+      }
+
+      return `${mm}:${ss}`;
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // 5. Contrôleur Principal du Jeu
   // --------------------------------------------------------------------------
   class ChessApp {
@@ -831,6 +1082,16 @@
       this.animTimer = null;
       this.toastTimer = null;
       this.illegalAnimTimer = null;
+      this.lastTickBeep = null;
+
+      // Anti-veille & Horloge
+      this.wakeLock = new ScreenWakeLock((state) => this.updateWakeLockUI(state));
+      this.clock = new ChessClock({
+        initialTime: 600,
+        increment: 0,
+        onTick: (state) => this.updateClockUI(state),
+        onTimeout: (loserColor) => this.handleTimeout(loserColor)
+      });
 
       // Cache DOM
       this.dom = {
@@ -844,11 +1105,16 @@
         avatarTop: document.getElementById('avatar-top'),
         capturedTop: document.getElementById('captured-top-pieces'),
         advTop: document.getElementById('adv-top'),
+        clockTop: document.getElementById('clock-top'),
+        clockBottom: document.getElementById('clock-bottom'),
+        timeTop: document.getElementById('time-top'),
+        timeBottom: document.getElementById('time-bottom'),
         nameBottom: document.getElementById('name-bottom'),
         subBottom: document.getElementById('sub-bottom'),
         avatarBottom: document.getElementById('avatar-bottom'),
         capturedBottom: document.getElementById('captured-bottom-pieces'),
         advBottom: document.getElementById('adv-bottom'),
+        timeControlSelect: document.getElementById('time-control-select'),
         statusBanner: document.getElementById('game-status-banner'),
         historyTbody: document.getElementById('history-tbody'),
         historyEmpty: document.getElementById('history-empty'),
@@ -862,6 +1128,9 @@
         btnSound: document.getElementById('btn-sound'),
         soundIcon: document.getElementById('sound-icon'),
         btnTheme: document.getElementById('btn-theme'),
+        btnWakeLock: document.getElementById('btn-wakelock'),
+        wakeLockIcon: document.getElementById('wakelock-icon'),
+        btnInstall: document.getElementById('btn-install'),
         btnRules: document.getElementById('btn-rules'),
         btnRulesClose: document.getElementById('btn-rules-close'),
         btnCoachToggle: document.getElementById('btn-coach-toggle'),
@@ -893,10 +1162,13 @@
     }
 
     init() {
+      this.initPwa();
       this.loadPreferences();
       this.bindEvents();
       this.buildBoard();
       this.render();
+      this.wakeLock.acquire();
+      this.clock.onTick(this.clock.getState());
 
       if (this.mode === 'ai' && this.aiColor === 'w') {
         this.triggerAiMove();
@@ -959,6 +1231,168 @@
       this.syncCoachToggleUI();
       this.savePreferences();
       this.showToast(this.coachEnabled ? '🎓 Guide d\'Aide Apprenti activé' : '🎓 Guide d\'Aide Apprenti masqué');
+    }
+
+    // ------------------------------------------------------------------------
+    // PWA & Gestion de l'Installation
+    // ------------------------------------------------------------------------
+    initPwa() {
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then((reg) => {
+            console.log('PWA Service Worker actif :', reg.scope);
+          }).catch((err) => {
+            console.warn('Erreur enregistrement SW :', err);
+          });
+        });
+      }
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredInstallPrompt = e;
+        if (this.dom.btnInstall) {
+          this.dom.btnInstall.classList.remove('hidden');
+        }
+      });
+
+      window.addEventListener('appinstalled', () => {
+        window.deferredInstallPrompt = null;
+        if (this.dom.btnInstall) {
+          this.dom.btnInstall.classList.add('hidden');
+        }
+        this.showToast('🎉 Application installée ! Jouable hors-ligne à tout moment.');
+      });
+    }
+
+    handlePwaInstall() {
+      if (window.deferredInstallPrompt) {
+        window.deferredInstallPrompt.prompt();
+        window.deferredInstallPrompt.userChoice.then((choice) => {
+          if (choice.outcome === 'accepted') {
+            this.showToast('🎉 Application installée avec succès !');
+          }
+          window.deferredInstallPrompt = null;
+          if (this.dom.btnInstall) this.dom.btnInstall.classList.add('hidden');
+        });
+      } else {
+        this.showToast("📱 Pour installer : appuyez sur le bouton Partager de votre navigateur puis « Sur l'écran d'accueil ».");
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Anti-Veille & Horloge Digitale
+    // ------------------------------------------------------------------------
+    updateWakeLockUI(state) {
+      if (!this.dom.btnWakeLock) return;
+      this.dom.btnWakeLock.classList.toggle('active', state.enabled);
+      if (this.dom.wakeLockIcon) {
+        this.dom.wakeLockIcon.textContent = state.enabled ? '👁️' : '💤';
+      }
+      this.dom.btnWakeLock.title = state.enabled
+        ? 'Mode Anti-veille : Activé (votre écran restera allumé)'
+        : 'Mode Anti-veille : Désactivé (l\'écran peut s\'éteindre)';
+    }
+
+    updateClockUI(state) {
+      if (!this.dom.timeTop || !this.dom.timeBottom) return;
+
+      const topColor = this.isFlipped ? 'w' : 'b';
+      const bottomColor = this.isFlipped ? 'b' : 'w';
+
+      const topFormatted = (topColor === 'w') ? state.whiteFormatted : state.blackFormatted;
+      const bottomFormatted = (bottomColor === 'w') ? state.whiteFormatted : state.blackFormatted;
+      const topSecs = (topColor === 'w') ? state.whiteTime : state.blackTime;
+      const bottomSecs = (bottomColor === 'w') ? state.whiteTime : state.blackTime;
+
+      this.dom.timeTop.textContent = topFormatted;
+      this.dom.timeBottom.textContent = bottomFormatted;
+
+      const isTopRunning = state.isRunning && (state.activeColor === topColor);
+      const isBottomRunning = state.isRunning && (state.activeColor === bottomColor);
+
+      this.dom.clockTop.classList.toggle('active', isTopRunning);
+      this.dom.clockBottom.classList.toggle('active', isBottomRunning);
+
+      // Alertes de temps faible pour le joueur actif
+      if (!state.isUnlimited) {
+        this.dom.clockTop.classList.toggle('low-time', topSecs < 30 && topSecs > 10);
+        this.dom.clockTop.classList.toggle('critical-time', topSecs <= 10 && topSecs > 0);
+        this.dom.clockBottom.classList.toggle('low-time', bottomSecs < 30 && bottomSecs > 10);
+        this.dom.clockBottom.classList.toggle('critical-time', bottomSecs <= 10 && bottomSecs > 0);
+
+        // Bip discret à chaque seconde quand le joueur actif a moins de 10 secondes
+        const activeSecs = (state.activeColor === 'w') ? state.whiteTime : state.blackTime;
+        if (state.isRunning && activeSecs <= 10 && activeSecs > 0) {
+          const currentInteger = Math.floor(activeSecs);
+          if (this.lastTickBeep !== currentInteger) {
+            this.lastTickBeep = currentInteger;
+            this.audio.playClockTick();
+          }
+        }
+      } else {
+        this.dom.clockTop.classList.remove('low-time', 'critical-time');
+        this.dom.clockBottom.classList.remove('low-time', 'critical-time');
+      }
+    }
+
+    handleTimeout(loserColor) {
+      const winnerColor = (loserColor === 'w') ? 'b' : 'w';
+      const winnerName = (winnerColor === 'w') ? 'Blancs' : 'Noirs';
+      const loserName = (loserColor === 'w') ? 'Blancs' : 'Noirs';
+
+      this.audio.playTimeout();
+      this.wakeLock.release();
+
+      // Vérifier le matériel de l'adversaire (règle FIDE si matériel insuffisant = nulle)
+      const hasMatingMaterial = this.hasMatingMaterial(winnerColor);
+
+      let title = "⏱️ Temps Écoulé !";
+      let desc = "";
+      let icon = "⌛";
+
+      if (!hasMatingMaterial) {
+        title = "Match Nul (Temps & Matériel Insuffisant)";
+        desc = `Les ${loserName} ont dépassé le temps réglementaire, mais les ${winnerName} n'ont pas de matériel suffisant pour mater. Match nul selon les règles officielles FIDE !`;
+        icon = "🤝";
+      } else {
+        title = `Victoire des ${winnerName} au Temps !`;
+        desc = `Dépassement du temps réglementaire pour les ${loserName}. Les ${winnerName} remportent la partie !`;
+        icon = (this.mode === 'ai') ? ((winnerColor !== this.aiColor) ? "🏆" : "🤖") : "🏆";
+      }
+
+      const movesCount = this.game.history().length;
+      this.dom.gameOverIcon.textContent = icon;
+      this.dom.gameOverTitle.textContent = title;
+      this.dom.gameOverDesc.textContent = desc;
+      this.dom.gameOverStats.innerHTML = `
+        <span><strong>${movesCount}</strong> coups joués</span>
+        <span>Fin : <strong>Dépassement de Temps</strong></span>
+      `;
+
+      this.dom.modalGameOver.classList.remove('hidden');
+    }
+
+    hasMatingMaterial(color) {
+      const board = this.game.board();
+      let hasQueen = false, hasRook = false, hasPawn = false;
+      let bishops = 0, knights = 0;
+
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const p = board[r][c];
+          if (p && p.color === color) {
+            if (p.type === 'q') hasQueen = true;
+            if (p.type === 'r') hasRook = true;
+            if (p.type === 'p') hasPawn = true;
+            if (p.type === 'b') bishops++;
+            if (p.type === 'n') knights++;
+          }
+        }
+      }
+
+      if (hasQueen || hasRook || hasPawn) return true;
+      if (bishops >= 2 || (bishops >= 1 && knights >= 1) || knights >= 3) return true;
+      return false;
     }
 
     updateCoachMessage({ type = 'info', title, text, rule }) {
@@ -1486,9 +1920,15 @@
       this.render();
 
       if (this.game.game_over()) {
+        this.clock.stop();
+        this.wakeLock.release();
         this.showGameOverModal();
         return true;
       }
+
+      // Alternance de l'horloge vers le joueur dont c'est le tour
+      this.clock.switchTurn(this.game.turn());
+      this.wakeLock.acquire();
 
       if (this.mode === 'ai' && this.game.turn() === this.aiColor) {
         this.triggerAiMove();
@@ -1596,6 +2036,12 @@
         };
       } else {
         this.lastMove = null;
+      }
+
+      if (this.game.history().length === 0) {
+        this.clock.reset();
+      } else {
+        this.clock.switchTurn(this.game.turn());
       }
 
       this.clearSelection();
@@ -1825,6 +2271,9 @@
     // Fin de Partie & Modale
     // ------------------------------------------------------------------------
     showGameOverModal() {
+      this.clock.stop();
+      this.wakeLock.release();
+
       let title = "Partie Terminée";
       let desc = "";
       let icon = "🏁";
@@ -1885,6 +2334,9 @@
       this.dom.modalGameOver.classList.add('hidden');
       this.dom.modalPromotion.classList.add('hidden');
 
+      this.clock.reset();
+      this.wakeLock.acquire();
+
       this.updateCoachMessage({
         type: 'info',
         title: '🎓 Nouvelle Partie - Guide Apprenti prêt !',
@@ -1903,6 +2355,7 @@
       this.isFlipped = !this.isFlipped;
       this.buildBoard();
       this.render();
+      this.updateClockUI(this.clock.getState());
     }
 
     cycleTheme() {
@@ -1930,6 +2383,30 @@
       this.dom.btnFlip.addEventListener('click', () => this.flipBoard());
       this.dom.btnSound.addEventListener('click', () => this.toggleSound());
       this.dom.btnTheme.addEventListener('click', () => this.cycleTheme());
+
+      if (this.dom.btnWakeLock) {
+        this.dom.btnWakeLock.addEventListener('click', () => {
+          const isEnabled = this.wakeLock.toggle();
+          this.showToast(isEnabled ? '👁️ Anti-veille activé : écran maintenu allumé' : '💤 Anti-veille désactivé');
+        });
+      }
+
+      if (this.dom.btnInstall) {
+        this.dom.btnInstall.addEventListener('click', () => {
+          this.handlePwaInstall();
+        });
+      }
+
+      if (this.dom.timeControlSelect) {
+        this.dom.timeControlSelect.addEventListener('change', (e) => {
+          const val = e.target.value;
+          this.clock.setTimeControl(val);
+          try {
+            localStorage.setItem('chess_time_control', val);
+          } catch (_) {}
+          this.showToast(`⏱️ Cadence : ${e.target.options[e.target.selectedIndex].text}`);
+        });
+      }
 
       if (this.dom.btnCoachToggle) {
         this.dom.btnCoachToggle.addEventListener('click', () => this.toggleCoachMode());
